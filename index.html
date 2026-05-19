@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>White Board / Teams Chat Audit Tool — SBUH Perioperative</title>
+<style>
+  :root {
+    --ink: #0f1a2b;
+    --ink-2: #34465f;
+    --muted: #6b7a90;
+    --line: #d9dee7;
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --accent: #0b5cad;
+    --accent-deep: #073d77;
+    --ok: #117a3d;
+    --ok-bg: #e6f4ec;
+    --warn: #b06a00;
+    --warn-bg: #fdf2dc;
+    --flag: #b3261e;
+    --flag-bg: #fde7e5;
+    --shadow: 0 1px 2px rgba(15,26,43,0.06), 0 4px 14px rgba(15,26,43,0.06);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Header */
+  header {
+    background: linear-gradient(135deg, var(--accent-deep), var(--accent));
+    color: #fff;
+    padding: 14px 18px;
+    position: sticky; top: 0; z-index: 50;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+  header .title { font-size: 17px; font-weight: 700; letter-spacing: 0.2px; }
+  header .sub { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+  header .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  header .meta { font-size: 12px; opacity: 0.9; text-align: right; }
+
+  /* Tab bar */
+  nav.tabs {
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    position: sticky; top: 58px; z-index: 40;
+  }
+  nav.tabs button {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 12px 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.15s;
+  }
+  nav.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  main { padding: 14px; max-width: 900px; margin: 0 auto; }
+
+  /* Round controls */
+  .round-bar {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .round-bar .info { font-size: 13px; color: var(--ink-2); }
+  .round-bar .info strong { color: var(--ink); }
+  .round-bar .progress { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* OR card */
+  .or-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+    transition: border-color 0.15s;
+  }
+  .or-card.flagged { border-left: 4px solid var(--flag); }
+  .or-card.complete { border-left: 4px solid var(--ok); }
+  .or-card.nocases { border-left: 4px solid var(--muted); background: #fafbfd; }
+  .or-card .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  .or-card .or-num { font-size: 16px; font-weight: 700; color: var(--ink); }
+  .or-card .status-pill {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .status-pending { background: #eef1f6; color: var(--muted); }
+  .status-complete { background: var(--ok-bg); color: var(--ok); }
+  .status-flagged { background: var(--flag-bg); color: var(--flag); }
+  .status-nocases { background: #eef1f6; color: var(--ink-2); }
+  .or-card .body { margin-top: 12px; display: none; }
+  .or-card.open .body { display: block; }
+  .or-card .caret { color: var(--muted); font-size: 12px; margin-left: 8px; }
+
+  /* Form rows */
+  .field { margin-bottom: 14px; }
+  .field label.q {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-2);
+    margin-bottom: 6px;
+  }
+  .yn-group { display: flex; gap: 8px; }
+  .yn-btn {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1.5px solid var(--line);
+    background: #fff;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .yn-btn:hover { border-color: var(--accent); }
+  .yn-btn.sel-yes { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
+  .yn-btn.sel-no { background: var(--flag-bg); border-color: var(--flag); color: var(--flag); }
+
+  .name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .name-row .col label { font-size: 12px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 4px; }
+  .autocomplete-wrap { position: relative; }
+  .autocomplete-wrap input {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1.5px solid var(--line);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+  }
+  .autocomplete-wrap input:focus { outline: none; border-color: var(--accent); }
+  .ac-list {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0; right: 0;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+    z-index: 30;
+    box-shadow: 0 4px 14px rgba(15,26,43,0.12);
+    display: none;
+  }
+  .ac-list.show { display: block; }
+  .ac-item { padding: 8px 11px; font-size: 14px; cursor: pointer; border-bottom: 1px solid #f0f2f6; }
+  .ac-item:last-child { border-bottom: none; }
+  .ac-item:hover, .ac-item.kbd-focus { background: #eef4fb; color: var(--accent-deep); }
+  .ac-item.add-new { color: var(--accent); font-weight: 600; }
+
+  .reminder-box {
+    margin-top: 10px;
+    background: var(--warn-bg);
+    border: 1px solid #f0d59a;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .reminder-box label.q { color: var(--warn); }
+  .reminder-chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .reminder-chip {
+    padding: 6px 10px;
+    border: 1.5px solid #e3c785;
+    background: #fff;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--warn);
+    cursor: pointer;
+  }
+  .reminder-chip.sel { background: var(--warn); color: #fff; border-color: var(--warn); }
+
+  .flag-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1.5px dashed var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .flag-toggle.on { background: var(--flag-bg); border-color: var(--flag); border-style: solid; }
+  .flag-toggle .icon { width: 20px; height: 20px; border-radius: 4px; border: 2px solid var(--muted); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .flag-toggle.on .icon { background: var(--flag); border-color: var(--flag); color: #fff; font-weight: 700; }
+  .flag-toggle .lbl { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .flag-toggle.on .lbl { color: var(--flag); }
+
+  .nocases-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1.5px dashed var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .nocases-toggle.on { background: #eef1f6; border-color: var(--ink-2); border-style: solid; }
+  .nocases-toggle .icon { width: 20px; height: 20px; border-radius: 4px; border: 2px solid var(--muted); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .nocases-toggle.on .icon { background: var(--ink-2); border-color: var(--ink-2); color: #fff; font-weight: 700; }
+  .nocases-toggle .lbl { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+
+  .notes-input {
+    width: 100%;
+    margin-top: 8px;
+    padding: 9px 11px;
+    border: 1.5px solid var(--line);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 56px;
+    background: #fff;
+  }
+  .notes-input:focus { outline: none; border-color: var(--accent); }
+
+  /* Buttons */
+  .btn {
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary:hover { background: var(--accent-deep); }
+  .btn.danger { color: var(--flag); border-color: #f0bcb8; }
+  .btn.ghost { background: transparent; }
+
+  /* Report page */
+  .report-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .report-summary {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .report-summary h2 { margin: 0 0 4px 0; font-size: 16px; }
+  .report-summary .meta-line { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-box {
+    padding: 12px;
+    border-radius: 8px;
+    background: #f4f6fa;
+    border: 1px solid var(--line);
+  }
+  .stat-box .num { font-size: 22px; font-weight: 700; color: var(--ink); }
+  .stat-box .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); font-weight: 600; }
+  .stat-box.flag .num { color: var(--flag); }
+  .stat-box.ok .num { color: var(--ok); }
+
+  .or-row {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .or-row:last-child { border-bottom: none; }
+  .or-row .label { font-weight: 700; color: var(--ink); }
+  .or-row .details { color: var(--ink-2); }
+  .or-row .details .line { margin-bottom: 3px; }
+  .or-row .details .flag-line { color: var(--flag); font-weight: 600; }
+  .or-row .details .ok-line { color: var(--ok); }
+
+  /* Providers tab */
+  .provider-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+    flex-wrap: wrap;
+  }
+  .prov-count { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .provider-list {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .provider-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+  }
+  .provider-item:last-child { border-bottom: none; }
+  .provider-item .role-badge {
+    font-size: 10px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+  }
+  .role-attending { background: #e0eafd; color: var(--accent-deep); }
+  .role-extender { background: #ede1f8; color: #6a3b9c; }
+  .role-both { background: #d8eee0; color: var(--ok); }
+  .add-provider-form { display: flex; gap: 8px; padding: 12px 14px; background: #f9fafc; }
+  .add-provider-form input { flex: 1; padding: 8px 10px; border: 1.5px solid var(--line); border-radius: 6px; font-size: 14px; }
+  .add-provider-form select { padding: 8px 10px; border: 1.5px solid var(--line); border-radius: 6px; font-size: 13px; background: #fff; }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(15,26,43,0.5);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  }
+  .modal h3 { margin: 0 0 6px 0; font-size: 16px; }
+  .modal p { margin: 0 0 14px 0; color: var(--ink-2); font-size: 14px; }
+  .modal .row { display: flex; gap: 8px; justify-content: flex-end; }
+  .modal input, .modal select {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1.5px solid var(--line);
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 10px;
+    font-family: inherit;
+  }
+
+  @media print {
+    header, nav.tabs, .report-controls, .round-bar { display: none !important; }
+    body { background: #fff; }
+    .report-summary, .or-card { box-shadow: none; border: 1px solid #999; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="row">
+    <div>
+      <div class="title">White Board / Teams Chat Audit Tool</div>
+      <div class="sub">SBUH Perioperative · Board Compliance &amp; Teams Chat Verification</div>
+    </div>
+    <div class="meta" id="meta-line">—</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="active" data-tab="round" onclick="switchTab('round')">Round</button>
+  <button data-tab="report" onclick="switchTab('report')">Report</button>
+  <button data-tab="providers" onclick="switchTab('providers')">Providers</button>
+</nav>
+
+<main>
+
+  <!-- ROUND TAB -->
+  <section id="tab-round">
+    <div class="round-bar">
+      <div class="info">
+        <div><strong id="round-date">—</strong></div>
+        <div class="progress" id="round-progress">0 of 21 rooms checked</div>
+      </div>
+      <div>
+        <button class="btn ghost" onclick="resetCurrentRound()" title="Clear all room entries in this round">⟲ Reset</button>
+        <button class="btn primary" onclick="completeAndSend()">✓ Complete &amp; Send</button>
+        <button class="btn" onclick="switchTab('report')">View Report</button>
+      </div>
+    </div>
+
+    <div id="or-list"></div>
+  </section>
+
+  <!-- REPORT TAB -->
+  <section id="tab-report" style="display:none;">
+    <div class="report-controls">
+      <button class="btn primary" onclick="exportCSV()">Export CSV</button>
+      <button class="btn" onclick="exportHTML()">Export HTML</button>
+      <button class="btn" onclick="window.print()">Print</button>
+      <button class="btn ghost" onclick="switchTab('round')">← Back to Round</button>
+    </div>
+    <div id="report-content"></div>
+  </section>
+
+  <!-- PROVIDERS TAB -->
+  <section id="tab-providers" style="display:none;">
+    <div class="provider-toolbar">
+      <div class="prov-count" id="prov-count">0 providers</div>
+      <div style="flex:1;"></div>
+      <button class="btn" onclick="syncFromCurrentRound()" title="Pull any names typed in rooms into the master list">↻ Sync from Round</button>
+      <button class="btn" onclick="openBulkAdd()">+ Bulk Add</button>
+      <button class="btn ghost" onclick="restoreDefaultAttendings()" title="Re-add the built-in SBUH attending roster (won't duplicate)">Restore Defaults</button>
+      <button class="btn ghost" onclick="exportProviders()">Export</button>
+      <button class="btn ghost" onclick="document.getElementById('import-providers-file').click()">Import</button>
+      <input type="file" id="import-providers-file" accept=".json,.txt" style="display:none;" onchange="importProvidersFile(event)">
+    </div>
+    <div class="provider-list" id="provider-list-container">
+      <div class="add-provider-form">
+        <input type="text" id="new-prov-name" placeholder="Full name (e.g., Smith, John MD)">
+        <select id="new-prov-role">
+          <option value="both">Either</option>
+          <option value="attending">Attending</option>
+          <option value="extender">Extender</option>
+        </select>
+        <button class="btn primary" onclick="addProviderFromTab()">Add</button>
+      </div>
+      <div id="provider-list"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Bulk add modal -->
+<div class="modal-backdrop" id="bulk-modal">
+  <div class="modal" style="max-width: 520px;">
+    <h3>Bulk Add Providers</h3>
+    <p>Paste names — one per line. Format flexible: "Smith, John MD", "John Smith", etc.</p>
+    <div style="margin-bottom: 10px;">
+      <label style="font-size: 12px; color: var(--ink-2); font-weight: 600;">Assign role to all:</label>
+      <select id="bulk-role" style="margin-left: 8px; padding: 6px 10px; border: 1.5px solid var(--line); border-radius: 6px; font-size: 13px;">
+        <option value="both">Either (recommended)</option>
+        <option value="attending">All Attending</option>
+        <option value="extender">All Extender</option>
+      </select>
+    </div>
+    <textarea id="bulk-input"
+      style="width:100%; height: 220px; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 13px; resize: vertical;"
+      placeholder="Smith, John MD&#10;Jones, Sarah CRNA&#10;Goldberg, M DO&#10;..."></textarea>
+    <div id="bulk-preview" style="font-size: 12px; color: var(--muted); margin-top: 6px; min-height: 16px;"></div>
+    <div class="row" style="margin-top: 12px;">
+      <button class="btn" onclick="closeBulkModal()">Cancel</button>
+      <button class="btn primary" onclick="processBulkAdd()">Add All</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-backdrop" id="confirm-modal">
+  <div class="modal">
+    <h3 id="confirm-title">Confirm</h3>
+    <p id="confirm-msg">Are you sure?</p>
+    <div class="row">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Complete & Send modal -->
+<div class="modal-backdrop" id="complete-modal">
+  <div class="modal" style="max-width: 520px;">
+    <h3>Round Complete</h3>
+    <p id="complete-status">—</p>
+    <textarea id="complete-payload" readonly
+      style="width:100%; height: 220px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; padding: 10px; border: 1.5px solid var(--line); border-radius: 8px; resize: vertical; background: #f9fafc;"
+      onclick="this.select()"></textarea>
+    <p style="font-size: 12px; color: var(--muted); margin-top: 8px;">
+      Text the message to yourself, then paste it into the master report to archive.
+      Keep the <code style="background:#eef1f6; padding:1px 4px; border-radius:3px;">--ORDATA--</code> block intact for accurate import.
+    </p>
+    <div class="row" style="margin-top: 14px;">
+      <button class="btn" onclick="closeCompleteModal()">Keep Editing</button>
+      <button class="btn ghost" onclick="copyAgain()">Copy Again</button>
+      <button class="btn primary" onclick="archiveAndReset()">Archive &amp; Start New Round</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==================== Constants ==================== */
+const OR_NUMBERS = [
+  2,3,4,5,6,         // 2-6
+  8,9,10,11,12,       // 8-12
+  14,15,16,17,18,19,20,21,22,23,24,25  // 14-25
+];
+
+const REMINDER_FLAGS = {
+  attendingName: "Attending name missing from board",
+  extenderName: "Extender name missing from board",
+  textChain: "Teams Chat reminder needed"
+};
+
+
+/* ==================== State ==================== */
+let state = loadState();
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem('or-rounding-state-v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Migrate: ensure currentRound exists and has all current OR_NUMBERS as rooms
+      if (!parsed.currentRound || !parsed.currentRound.rooms) {
+        parsed.currentRound = newRoundObject();
+      } else {
+        // Add any new rooms that exist in OR_NUMBERS but not in saved state
+        OR_NUMBERS.forEach(n => {
+          if (!parsed.currentRound.rooms[n]) {
+            parsed.currentRound.rooms[n] = freshRoom();
+          } else {
+            // Migrate: ensure room has all expected fields
+            const r = parsed.currentRound.rooms[n];
+            if (r.noCases === undefined) r.noCases = false;
+            if (r.textChainReminded === undefined) r.textChainReminded = null;
+            if (r.attendingName === undefined) r.attendingName = '';
+            if (r.extenderName === undefined) r.extenderName = '';
+            if (r.attendingOnBoard === undefined) r.attendingOnBoard = null;
+            if (r.extenderOnBoard === undefined) r.extenderOnBoard = null;
+            if (!Array.isArray(r.remindersNeeded)) r.remindersNeeded = [];
+            if (r.flagged === undefined) r.flagged = false;
+            if (r.notes === undefined) r.notes = '';
+          }
+        });
+      }
+      // Ensure providers and history exist
+      if (!Array.isArray(parsed.providers)) parsed.providers = defaultProviders();
+      if (!Array.isArray(parsed.history)) parsed.history = [];
+      return parsed;
+    }
+  } catch(e) {
+    console.error('loadState failed:', e);
+  }
+  return {
+    providers: defaultProviders(),
+    currentRound: newRoundObject(),
+    history: []
+  };
+}
+
+function freshRoom() {
+  return {
+    noCases: false,
+    textChainReminded: null,
+    attendingName: '',
+    extenderName: '',
+    attendingOnBoard: null,
+    extenderOnBoard: null,
+    remindersNeeded: [],
+    flagged: false,
+    notes: '',
+    lastUpdated: null
+  };
+}
+
+function defaultProviders() {
+  // SBUH Anesthesiology roster — seeded on first load
+  const attendings = [
+    "Abola, R","Al-Bizri, E","Andraous, W","Angelo, T","Atkinson, D",
+    "Beg, T","Bell, J","Bennici, L","Bergese, S","Bindelglass, A",
+    "Cho, B","Corrado, T","Costa, A","Daoud, B","Delemos, M",
+    "Desai, A","Epstein, R","Feit, A","Fischl, A","Fleischer, L",
+    "Geralemou, S","Gidicsin, C","Giordano, M","Guo, X","Izrailtyan, I",
+    "Jacob, Z","Jasiewicz, R","Jin, J","Kogan, A","Lehman, R",
+    "Lin, J","Liu, S","Lokshina, I","Marghoob, S","Mathew, A",
+    "Melville, B","Moller, D","Moore, R","Nada, E","Oleszak, S",
+    "Oster, J","Parikh, S","Paul, D","Poovathoor, S","Poppers, J",
+    "Probst, S","Saunders, T","Schwartz, J","Scorsere, J","Scott, B",
+    "Seiter, C","Tateosian, V","Vuong, W","Wang, M","Wirski, R",
+    "Yeung, I","Zabirowitz, E"
+  ];
+  const extenders = [
+    "Aguilar, E","Bargnes, V","Batista, S","Bentz, T","Bonser, K",
+    "Candelaria, R","Capozzoli, V","Carty, H","Charkowick, S","Cinquina, A",
+    "Corcoran, M","Correa, C","Crowley, S","Crugnola, W","David, J",
+    "Davidson, S","Day, M","DeTurris, S","Devitt, C","DiCicco, M",
+    "DiMaria, S","Eshtiaghour, R","Fernandez, A","Figueroa-Olsen, N","Fils-Aime, N",
+    "Fisher, L","Forte, A","Frusetta, C","Garcia, I","Garnier, S",
+    "Garrison, C","Garrity, M","Gnolfo, J","Gombert, A","Gomez, S",
+    "Greenspan, S","Hameed, W","Hippensteel, L","Hirsch, J","Histand, H",
+    "Holod, N","Houlihan, R","Howell, D","Jacob, S","Janosick, K",
+    "Jimenez, J","Joseph, W","Kahng, J","Kennedy, L","Kerolus, K",
+    "Khalique, S","Khan, K","Ku, E","Law, C","Leemook-Cunningham, K",
+    "Leggio, J","Lin, S","Logue, L","Lowe, K","Mangano, N",
+    "Masseria, M","Mattern, M","Melkumov, V","Monanian, G","Morgan, C",
+    "Nerantzinis, A","Newman-Ferguson, N","Oliver, B","Palios, M","Patel, D",
+    "Peluso, M","Perez-Gabriel, N","Pham, A","Quiery, S","Rahman, S",
+    "Raventhirananthan, N","Sakho, B","San Roman, G","Sanu, S","Schilling, S",
+    "Schmalzried, E","Seepersaud, T","Starr, E","Stiebel, T","Tawfik, G",
+    "Tergino, S","Torpey, A","Tsivitis, A","Wang, A","Wang, E",
+    "Win, T","Wood, D","Yan, A","Yaw, G","Yep, H",
+    "Yonel, B","Zarkowski, Z","Zhou, M"
+  ];
+  const all = [
+    ...attendings.map(name => ({ name: name, role: 'attending' })),
+    ...extenders.map(name => ({ name: name, role: 'extender' }))
+  ];
+  // Sort alphabetically so list displays cleanly on first load
+  all.sort((a,b) => a.name.localeCompare(b.name));
+  return all;
+}
+
+function saveState() {
+  try { localStorage.setItem('or-rounding-state-v1', JSON.stringify(state)); } catch(e) {}
+}
+
+function newRoundObject() {
+  const rooms = {};
+  OR_NUMBERS.forEach(n => {
+    rooms[n] = {
+      noCases: false,          // no cases in this room today
+      textChainReminded: null, // 'yes' | 'no' | null
+      attendingName: '',
+      extenderName: '',
+      attendingOnBoard: null,  // 'yes' | 'no' | null
+      extenderOnBoard: null,
+      remindersNeeded: [],     // strings
+      flagged: false,
+      notes: '',
+      lastUpdated: null
+    };
+  });
+  return {
+    id: Date.now(),
+    startedAt: new Date().toISOString(),
+    rooms: rooms
+  };
+}
+
+/* ==================== Render: Round ==================== */
+function renderRound() {
+  const list = document.getElementById('or-list');
+  list.innerHTML = '';
+  OR_NUMBERS.forEach(n => list.appendChild(renderORCard(n)));
+  updateProgress();
+}
+
+function roomStatus(room) {
+  if (room.noCases) return 'nocases';
+  const anyAnswered = room.textChainReminded !== null ||
+                      room.attendingOnBoard !== null ||
+                      room.extenderOnBoard !== null ||
+                      room.attendingName || room.extenderName;
+  if (room.flagged) return 'flagged';
+  if (room.textChainReminded !== null && room.attendingOnBoard !== null && room.extenderOnBoard !== null) return 'complete';
+  if (anyAnswered) return 'partial';
+  return 'pending';
+}
+
+function renderORCard(orNum) {
+  // Defensive: if room missing for any reason (e.g. corrupted state), create on the fly
+  if (!state.currentRound.rooms[orNum]) {
+    state.currentRound.rooms[orNum] = freshRoom();
+  }
+  const room = state.currentRound.rooms[orNum];
+  const status = roomStatus(room);
+
+  const card = document.createElement('div');
+  card.className = 'or-card ' + (status === 'flagged' ? 'flagged' : status === 'complete' ? 'complete' : status === 'nocases' ? 'nocases' : '');
+  card.dataset.or = orNum;
+
+  const statusPillClass = status === 'flagged' ? 'status-flagged' :
+                          status === 'complete' ? 'status-complete' :
+                          status === 'nocases' ? 'status-nocases' : 'status-pending';
+  const statusLabel = status === 'flagged' ? '⚑ Flagged' :
+                      status === 'complete' ? '✓ Complete' :
+                      status === 'nocases' ? '— No cases' :
+                      status === 'partial' ? '… In progress' : 'Pending';
+
+  card.innerHTML = `
+    <div class="head" onclick="toggleCard(${orNum})">
+      <div class="or-num">OR ${orNum}</div>
+      <div><span class="status-pill ${statusPillClass}">${statusLabel}</span><span class="caret">▾</span></div>
+    </div>
+    <div class="body">
+      <!-- No cases toggle -->
+      <div class="field">
+        <div class="nocases-toggle ${room.noCases?'on':''}" onclick="toggleNoCases(${orNum})">
+          <div class="icon">${room.noCases?'✓':''}</div>
+          <div class="lbl">${room.noCases?'No cases in this room today':'Mark "No cases today"'}</div>
+        </div>
+      </div>
+
+      ${room.noCases ? '' : `
+      <!-- Teams Chat -->
+      <div class="field">
+        <label class="q">1. Team reminded about Teams Chat?</label>
+        <div class="yn-group">
+          <button class="yn-btn ${room.textChainReminded==='yes'?'sel-yes':''}" onclick="setYN(${orNum},'textChainReminded','yes')">Yes</button>
+          <button class="yn-btn ${room.textChainReminded==='no'?'sel-no':''}" onclick="setYN(${orNum},'textChainReminded','no')">No</button>
+        </div>
+      </div>
+
+      <!-- Names on board -->
+      <div class="field">
+        <label class="q">2. Names on the board?</label>
+        <div class="name-row">
+          <div class="col">
+            <label>Attending</label>
+            <div class="autocomplete-wrap">
+              <input type="text" id="att-${orNum}" value="${escapeAttr(room.attendingName)}"
+                placeholder="Type or select..."
+                oninput="onProviderInput(${orNum},'attending', this.value)"
+                onfocus="showAutocomplete(${orNum},'attending')"
+                onblur="hideAutocompleteSoon(${orNum},'attending')"
+                onkeydown="acKeydown(event, ${orNum},'attending')">
+              <div class="ac-list" id="ac-att-${orNum}"></div>
+            </div>
+            <div class="yn-group" style="margin-top:6px;">
+              <button class="yn-btn ${room.attendingOnBoard==='yes'?'sel-yes':''}" onclick="setBoard(${orNum},'attendingOnBoard','yes')">On board</button>
+              <button class="yn-btn ${room.attendingOnBoard==='no'?'sel-no':''}" onclick="setBoard(${orNum},'attendingOnBoard','no')">Missing</button>
+            </div>
+          </div>
+          <div class="col">
+            <label>Extender (CRNA/PA/NP/Resident)</label>
+            <div class="autocomplete-wrap">
+              <input type="text" id="ext-${orNum}" value="${escapeAttr(room.extenderName)}"
+                placeholder="Type or select..."
+                oninput="onProviderInput(${orNum},'extender', this.value)"
+                onfocus="showAutocomplete(${orNum},'extender')"
+                onblur="hideAutocompleteSoon(${orNum},'extender')"
+                onkeydown="acKeydown(event, ${orNum},'extender')">
+              <div class="ac-list" id="ac-ext-${orNum}"></div>
+            </div>
+            <div class="yn-group" style="margin-top:6px;">
+              <button class="yn-btn ${room.extenderOnBoard==='yes'?'sel-yes':''}" onclick="setBoard(${orNum},'extenderOnBoard','yes')">On board</button>
+              <button class="yn-btn ${room.extenderOnBoard==='no'?'sel-no':''}" onclick="setBoard(${orNum},'extenderOnBoard','no')">Missing</button>
+            </div>
+          </div>
+        </div>
+
+        ${(room.attendingOnBoard==='no' || room.extenderOnBoard==='no' || room.textChainReminded==='no') ? `
+        <div class="reminder-box">
+          <label class="q">Reminders to deliver:</label>
+          <div class="reminder-chip-row">
+            ${room.textChainReminded==='no' ? `<div class="reminder-chip ${room.remindersNeeded.includes('textChain')?'sel':''}" onclick="toggleReminder(${orNum},'textChain')">Teams Chat reminder</div>` : ''}
+            ${room.attendingOnBoard==='no' ? `<div class="reminder-chip ${room.remindersNeeded.includes('attendingName')?'sel':''}" onclick="toggleReminder(${orNum},'attendingName')">Add attending to board</div>` : ''}
+            ${room.extenderOnBoard==='no' ? `<div class="reminder-chip ${room.remindersNeeded.includes('extenderName')?'sel':''}" onclick="toggleReminder(${orNum},'extenderName')">Add extender to board</div>` : ''}
+          </div>
+        </div>` : ''}
+      </div>
+
+      <!-- Flag -->
+      <div class="field">
+        <div class="flag-toggle ${room.flagged?'on':''}" onclick="toggleFlag(${orNum})">
+          <div class="icon">${room.flagged?'✓':''}</div>
+          <div class="lbl">${room.flagged?'Room flagged for follow-up':'Flag this room for follow-up'}</div>
+        </div>
+      </div>
+      `}
+
+      <!-- Notes -->
+      <div class="field">
+        <label class="q">Notes (optional)</label>
+        <textarea class="notes-input" id="notes-${orNum}"
+          oninput="setNotes(${orNum}, this.value)"
+          placeholder="Any context...">${escapeText(room.notes)}</textarea>
+      </div>
+    </div>
+  `;
+
+  // restore open state if it was open
+  if (openCards.has(orNum)) card.classList.add('open');
+
+  return card;
+}
+
+const openCards = new Set();
+function toggleCard(orNum) {
+  const card = document.querySelector(`.or-card[data-or="${orNum}"]`);
+  if (!card) return;
+  card.classList.toggle('open');
+  if (card.classList.contains('open')) openCards.add(orNum);
+  else openCards.delete(orNum);
+}
+
+function escapeAttr(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function escapeText(s) { return (s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeHTML(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ==================== Field setters ==================== */
+function setYN(orNum, field, val) {
+  const room = state.currentRound.rooms[orNum];
+  room[field] = room[field] === val ? null : val;
+  room.lastUpdated = new Date().toISOString();
+  saveState();
+  rerenderCard(orNum);
+}
+
+function setBoard(orNum, field, val) {
+  const room = state.currentRound.rooms[orNum];
+  const prev = room[field];
+  room[field] = room[field] === val ? null : val;
+
+  // If switched away from 'no', clear that reminder
+  if (prev === 'no' && room[field] !== 'no') {
+    const reminderKey = field === 'attendingOnBoard' ? 'attendingName' : 'extenderName';
+    room.remindersNeeded = room.remindersNeeded.filter(r => r !== reminderKey);
+  }
+
+  room.lastUpdated = new Date().toISOString();
+  saveState();
+  rerenderCard(orNum);
+}
+
+function toggleReminder(orNum, key) {
+  const room = state.currentRound.rooms[orNum];
+  if (room.remindersNeeded.includes(key)) {
+    room.remindersNeeded = room.remindersNeeded.filter(r => r !== key);
+  } else {
+    room.remindersNeeded.push(key);
+  }
+  room.lastUpdated = new Date().toISOString();
+  saveState();
+  rerenderCard(orNum);
+}
+
+function toggleNoCases(orNum) {
+  const room = state.currentRound.rooms[orNum];
+  room.noCases = !room.noCases;
+  // When marking no cases, clear any prior data to avoid confusion
+  if (room.noCases) {
+    room.textChainReminded = null;
+    room.attendingName = '';
+    room.extenderName = '';
+    room.attendingOnBoard = null;
+    room.extenderOnBoard = null;
+    room.remindersNeeded = [];
+    room.flagged = false;
+  }
+  room.lastUpdated = new Date().toISOString();
+  saveState();
+  rerenderCard(orNum);
+}
+
+function toggleFlag(orNum) {
+  const room = state.currentRound.rooms[orNum];
+  room.flagged = !room.flagged;
+  room.lastUpdated = new Date().toISOString();
+  saveState();
+  rerenderCard(orNum);
+}
+
+function setNotes(orNum, val) {
+  state.currentRound.rooms[orNum].notes = val;
+  state.currentRound.rooms[orNum].lastUpdated = new Date().toISOString();
+  saveState();
+  // don't rerender; just save (avoid losing cursor)
+  updateProgress();
+}
+
+function rerenderCard(orNum) {
+  const old = document.querySelector(`.or-card[data-or="${orNum}"]`);
+  if (!old) return;
+  const wasOpen = old.classList.contains('open');
+  if (wasOpen) openCards.add(orNum); else openCards.delete(orNum);
+  const fresh = renderORCard(orNum);
+  old.replaceWith(fresh);
+  updateProgress();
+}
+
+function updateProgress() {
+  const total = OR_NUMBERS.length;
+  let done = 0, flagged = 0, noCases = 0;
+  OR_NUMBERS.forEach(n => {
+    const s = roomStatus(state.currentRound.rooms[n]);
+    if (s === 'complete' || s === 'flagged' || s === 'nocases') done++;
+    if (state.currentRound.rooms[n].flagged) flagged++;
+    if (state.currentRound.rooms[n].noCases) noCases++;
+  });
+  const extras = [];
+  if (flagged > 0) extras.push(`${flagged} flagged`);
+  if (noCases > 0) extras.push(`${noCases} no cases`);
+  const extraTxt = extras.length ? ` · ${extras.join(' · ')}` : '';
+  document.getElementById('round-progress').textContent = `${done} of ${total} rooms checked${extraTxt}`;
+  document.getElementById('round-date').textContent = new Date(state.currentRound.startedAt).toLocaleString([], {dateStyle:'medium', timeStyle:'short'});
+  document.getElementById('meta-line').innerHTML = `Round started<br>${new Date(state.currentRound.startedAt).toLocaleString([], {dateStyle:'short', timeStyle:'short'})}`;
+}
+
+/* ==================== Autocomplete ==================== */
+let acFocus = {}; // {orNum_role: index}
+
+function onProviderInput(orNum, role, value) {
+  const field = role === 'attending' ? 'attendingName' : 'extenderName';
+  state.currentRound.rooms[orNum][field] = value;
+  state.currentRound.rooms[orNum].lastUpdated = new Date().toISOString();
+  saveState();
+  updateProgress();
+  showAutocomplete(orNum, role);
+}
+
+function showAutocomplete(orNum, role) {
+  const input = document.getElementById(role==='attending'?`att-${orNum}`:`ext-${orNum}`);
+  const list = document.getElementById(role==='attending'?`ac-att-${orNum}`:`ac-ext-${orNum}`);
+  const q = (input.value||'').trim().toLowerCase();
+
+  const matches = state.providers
+    .filter(p => p.role === 'both' || p.role === role)
+    .filter(p => !q || p.name.toLowerCase().includes(q))
+    .slice(0, 8);
+
+  let html = '';
+  matches.forEach((p, idx) => {
+    html += `<div class="ac-item" data-idx="${idx}" onmousedown="pickProvider(${orNum},'${role}','${escapeAttr(p.name)}')">${escapeHTML(p.name)}</div>`;
+  });
+  if (q && !state.providers.some(p => p.name.toLowerCase() === q)) {
+    html += `<div class="ac-item add-new" onmousedown="promptAddNew(${orNum},'${role}','${escapeAttr(input.value)}')">+ Add &quot;${escapeHTML(input.value)}&quot; as new provider</div>`;
+  } else if (!q) {
+    html += `<div class="ac-item add-new" onmousedown="promptAddNew(${orNum},'${role}','')">+ Add new provider</div>`;
+  }
+  list.innerHTML = html;
+  list.classList.add('show');
+  acFocus[`${orNum}_${role}`] = -1;
+}
+
+function hideAutocompleteSoon(orNum, role) {
+  setTimeout(() => {
+    const list = document.getElementById(role==='attending'?`ac-att-${orNum}`:`ac-ext-${orNum}`);
+    if (list) list.classList.remove('show');
+    // Auto-add typed name to master list if not already there
+    autoAddToMasterList(orNum, role);
+  }, 200);
+}
+
+function autoAddToMasterList(orNum, role) {
+  const input = document.getElementById(role==='attending'?`att-${orNum}`:`ext-${orNum}`);
+  if (!input) return;
+  const name = (input.value || '').trim();
+  if (!name) return;
+  // Don't add if already in master list (case-insensitive)
+  if (state.providers.some(p => p.name.toLowerCase() === name.toLowerCase())) return;
+  // Add with role 'both' so it's available in either dropdown going forward
+  state.providers.push({ name: name, role: 'both' });
+  state.providers.sort((a,b) => a.name.localeCompare(b.name));
+  saveState();
+  // If providers tab is currently open, refresh it
+  if (currentTab === 'providers') renderProviders();
+}
+
+function pickProvider(orNum, role, name) {
+  const input = document.getElementById(role==='attending'?`att-${orNum}`:`ext-${orNum}`);
+  input.value = name;
+  const field = role==='attending'?'attendingName':'extenderName';
+  state.currentRound.rooms[orNum][field] = name;
+  state.currentRound.rooms[orNum].lastUpdated = new Date().toISOString();
+  saveState();
+  const list = document.getElementById(role==='attending'?`ac-att-${orNum}`:`ac-ext-${orNum}`);
+  list.classList.remove('show');
+}
+
+function acKeydown(e, orNum, role) {
+  const list = document.getElementById(role==='attending'?`ac-att-${orNum}`:`ac-ext-${orNum}`);
+  if (!list.classList.contains('show')) return;
+  const items = list.querySelectorAll('.ac-item');
+  if (!items.length) return;
+  let idx = acFocus[`${orNum}_${role}`] ?? -1;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    idx = (idx + 1) % items.length;
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    idx = (idx - 1 + items.length) % items.length;
+  } else if (e.key === 'Enter' && idx >= 0) {
+    e.preventDefault();
+    items[idx].dispatchEvent(new MouseEvent('mousedown'));
+    return;
+  } else if (e.key === 'Escape') {
+    list.classList.remove('show');
+    return;
+  } else { return; }
+  items.forEach(it => it.classList.remove('kbd-focus'));
+  items[idx].classList.add('kbd-focus');
+  items[idx].scrollIntoView({block:'nearest'});
+  acFocus[`${orNum}_${role}`] = idx;
+}
+
+function promptAddNew(orNum, role, prefill) {
+  const name = prompt('Provider name (Last, First [credentials]):', prefill || '');
+  if (!name || !name.trim()) return;
+  const trimmed = name.trim();
+  if (state.providers.some(p => p.name.toLowerCase() === trimmed.toLowerCase())) {
+    alert('Provider already in list.');
+    pickProvider(orNum, role, trimmed);
+    return;
+  }
+  // Default new providers to "both" so they show in either dropdown
+  state.providers.push({ name: trimmed, role: 'both' });
+  state.providers.sort((a,b) => a.name.localeCompare(b.name));
+  saveState();
+  pickProvider(orNum, role, trimmed);
+  if (currentTab === 'providers') renderProviders();
+}
+
+/* ==================== Providers tab ==================== */
+function renderProviders() {
+  // Update count
+  const countEl = document.getElementById('prov-count');
+  if (countEl) {
+    const n = state.providers.length;
+    const att = state.providers.filter(p => p.role === 'attending').length;
+    const ext = state.providers.filter(p => p.role === 'extender').length;
+    const both = state.providers.filter(p => p.role === 'both').length;
+    let breakdown = '';
+    if (n > 0) {
+      const parts = [];
+      if (att) parts.push(`${att} att`);
+      if (ext) parts.push(`${ext} ext`);
+      if (both) parts.push(`${both} either`);
+      breakdown = ` · ${parts.join(', ')}`;
+    }
+    countEl.textContent = `${n} provider${n===1?'':'s'}${breakdown}`;
+  }
+
+  const list = document.getElementById('provider-list');
+  if (!state.providers.length) {
+    list.innerHTML = '<div style="padding:24px; text-align:center; color:var(--muted); font-size:13px;">No providers yet. Use <strong>+ Bulk Add</strong> above to paste a roster, add one at a time, or just start rounding — names auto-add as you type.</div>';
+    return;
+  }
+  list.innerHTML = state.providers.map((p, idx) => `
+    <div class="provider-item">
+      <div>
+        ${escapeHTML(p.name)}
+        <span class="role-badge role-${p.role}">${p.role === 'both' ? 'Either' : p.role}</span>
+      </div>
+      <div>
+        <button class="btn ghost" onclick="cycleProviderRole(${idx})" title="Change role">⇄</button>
+        <button class="btn danger ghost" onclick="removeProvider(${idx})">Remove</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function cycleProviderRole(idx) {
+  const order = ['both','attending','extender'];
+  const cur = state.providers[idx].role;
+  const next = order[(order.indexOf(cur)+1) % order.length];
+  state.providers[idx].role = next;
+  saveState();
+  renderProviders();
+}
+
+function removeProvider(idx) {
+  confirmModal('Remove provider', `Remove "${state.providers[idx].name}" from the list?`, () => {
+    state.providers.splice(idx, 1);
+    saveState();
+    renderProviders();
+  });
+}
+
+function addProviderFromTab() {
+  const nameEl = document.getElementById('new-prov-name');
+  const roleEl = document.getElementById('new-prov-role');
+  const name = nameEl.value.trim();
+  if (!name) return;
+  if (state.providers.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    alert('Provider already in list.');
+    return;
+  }
+  state.providers.push({ name: name, role: roleEl.value });
+  state.providers.sort((a,b) => a.name.localeCompare(b.name));
+  saveState();
+  nameEl.value = '';
+  renderProviders();
+}
+
+/* ==================== Sync From Round ==================== */
+function restoreDefaultAttendings() {
+  const defaults = defaultProviders();
+  const existingLower = new Set(state.providers.map(p => p.name.toLowerCase()));
+  let added = 0, skipped = 0;
+  defaults.forEach(p => {
+    if (existingLower.has(p.name.toLowerCase())) { skipped++; return; }
+    state.providers.push(p);
+    added++;
+  });
+  state.providers.sort((a,b) => a.name.localeCompare(b.name));
+  saveState();
+  renderProviders();
+  alert(`Restored built-in attending roster.\n\nAdded: ${added}\nAlready in list: ${skipped}`);
+}
+
+function syncFromCurrentRound() {
+  const existingLower = new Set(state.providers.map(p => p.name.toLowerCase()));
+  const found = new Map(); // lowercase -> {name, roles: Set}
+
+  OR_NUMBERS.forEach(n => {
+    const room = state.currentRound.rooms[n];
+    if (!room) return;
+    if (room.attendingName && room.attendingName.trim()) {
+      const name = room.attendingName.trim();
+      const lc = name.toLowerCase();
+      if (!found.has(lc)) found.set(lc, { name: name, roles: new Set() });
+      found.get(lc).roles.add('attending');
+    }
+    if (room.extenderName && room.extenderName.trim()) {
+      const name = room.extenderName.trim();
+      const lc = name.toLowerCase();
+      if (!found.has(lc)) found.set(lc, { name: name, roles: new Set() });
+      found.get(lc).roles.add('extender');
+    }
+  });
+
+  let added = 0, alreadyIn = 0;
+  found.forEach((info, lc) => {
+    if (existingLower.has(lc)) { alreadyIn++; return; }
+    // Determine role: if seen as both att and ext in the same round → 'both'; otherwise specific
+    let role;
+    if (info.roles.has('attending') && info.roles.has('extender')) role = 'both';
+    else if (info.roles.has('attending')) role = 'attending';
+    else role = 'extender';
+    state.providers.push({ name: info.name, role: role });
+    added++;
+  });
+
+  if (added > 0) {
+    state.providers.sort((a,b) => a.name.localeCompare(b.name));
+    saveState();
+    renderProviders();
+  }
+
+  if (found.size === 0) {
+    alert('No names found in the current round.');
+  } else {
+    alert(`Found ${found.size} unique name${found.size===1?'':'s'} in the current round.\n\nAdded: ${added}\nAlready in list: ${alreadyIn}`);
+  }
+}
+
+/* ==================== Bulk Add ==================== */
+function openBulkAdd() {
+  document.getElementById('bulk-input').value = '';
+  document.getElementById('bulk-preview').textContent = '';
+  document.getElementById('bulk-modal').classList.add('show');
+  // Wire up live preview
+  const ta = document.getElementById('bulk-input');
+  ta.oninput = updateBulkPreview;
+  setTimeout(() => ta.focus(), 50);
+}
+
+function closeBulkModal() {
+  document.getElementById('bulk-modal').classList.remove('show');
+}
+
+function parseBulkNames(text) {
+  return text.split(/\r?\n/)
+    .map(line => line.trim())
+    // Strip leading bullets/numbers ("• ", "- ", "1. ", "1) ")
+    .map(line => line.replace(/^[\s•\-*]+/, '').replace(/^\d+[.)]\s*/, '').trim())
+    .filter(line => line.length > 0);
+}
+
+function updateBulkPreview() {
+  const text = document.getElementById('bulk-input').value;
+  const names = parseBulkNames(text);
+  const existingLower = new Set(state.providers.map(p => p.name.toLowerCase()));
+  const seen = new Set();
+  let dupesInList = 0, dupesInPaste = 0, newCount = 0;
+  names.forEach(n => {
+    const lc = n.toLowerCase();
+    if (seen.has(lc)) { dupesInPaste++; return; }
+    seen.add(lc);
+    if (existingLower.has(lc)) dupesInList++;
+    else newCount++;
+  });
+  const preview = document.getElementById('bulk-preview');
+  if (!names.length) { preview.textContent = ''; return; }
+  let msg = `${names.length} line${names.length===1?'':'s'} parsed · ${newCount} new`;
+  if (dupesInList) msg += ` · ${dupesInList} already in list`;
+  if (dupesInPaste) msg += ` · ${dupesInPaste} duplicate in paste`;
+  preview.textContent = msg;
+}
+
+function processBulkAdd() {
+  const text = document.getElementById('bulk-input').value;
+  const role = document.getElementById('bulk-role').value;
+  const names = parseBulkNames(text);
+  if (!names.length) {
+    alert('No names to add.');
+    return;
+  }
+  const existingLower = new Set(state.providers.map(p => p.name.toLowerCase()));
+  const seenLower = new Set();
+  let added = 0, skipped = 0;
+  names.forEach(n => {
+    const lc = n.toLowerCase();
+    if (seenLower.has(lc) || existingLower.has(lc)) { skipped++; return; }
+    seenLower.add(lc);
+    state.providers.push({ name: n, role: role });
+    added++;
+  });
+  state.providers.sort((a,b) => a.name.localeCompare(b.name));
+  saveState();
+  closeBulkModal();
+  renderProviders();
+  alert(`Added ${added} provider${added===1?'':'s'}.${skipped?` Skipped ${skipped} duplicate${skipped===1?'':'s'}.`:''}`);
+}
+
+/* ==================== Export / Import Providers ==================== */
+function exportProviders() {
+  if (!state.providers.length) {
+    alert('No providers to export.');
+    return;
+  }
+  const data = {
+    type: 'or-rounding-providers',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    providers: state.providers
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `OR_Providers_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importProvidersFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = e.target.result;
+    let imported = [];
+
+    // Try JSON first
+    try {
+      const data = JSON.parse(text);
+      if (data.providers && Array.isArray(data.providers)) {
+        imported = data.providers.filter(p => p && p.name).map(p => ({
+          name: String(p.name).trim(),
+          role: ['attending','extender','both'].includes(p.role) ? p.role : 'both'
+        }));
+      } else if (Array.isArray(data)) {
+        // Plain array of strings or objects
+        imported = data.map(p => {
+          if (typeof p === 'string') return { name: p.trim(), role: 'both' };
+          return { name: String(p.name||'').trim(), role: p.role || 'both' };
+        }).filter(p => p.name);
+      }
+    } catch(err) {
+      // Fall back to plain text - one name per line
+      imported = parseBulkNames(text).map(n => ({ name: n, role: 'both' }));
+    }
+
+    if (!imported.length) {
+      alert('No providers found in file.');
+      event.target.value = '';
+      return;
+    }
+
+    // Merge with dedupe
+    const existingLower = new Set(state.providers.map(p => p.name.toLowerCase()));
+    let added = 0, skipped = 0;
+    imported.forEach(p => {
+      const lc = p.name.toLowerCase();
+      if (existingLower.has(lc)) { skipped++; return; }
+      existingLower.add(lc);
+      state.providers.push(p);
+      added++;
+    });
+    state.providers.sort((a,b) => a.name.localeCompare(b.name));
+    saveState();
+    renderProviders();
+    alert(`Imported ${added} new provider${added===1?'':'s'}.${skipped?` Skipped ${skipped} duplicate${skipped===1?'':'s'}.`:''}`);
+    event.target.value = '';  // reset so same file can be re-selected
+  };
+  reader.readAsText(file);
+}
+
+/* ==================== Report ==================== */
+function renderReport() {
+  const content = document.getElementById('report-content');
+  const round = state.currentRound;
+  let totalChecked = 0, totalFlagged = 0, totalNoCases = 0, totalActive = 0;
+  let textChainCompliant = 0, textChainAnswered = 0;
+  let attendingMissing = 0, extenderMissing = 0;
+  let totalReminders = 0;
+
+  OR_NUMBERS.forEach(n => {
+    const r = round.rooms[n];
+    const s = roomStatus(r);
+    if (s === 'complete' || s === 'flagged' || s === 'nocases') totalChecked++;
+    if (r.flagged) totalFlagged++;
+    if (r.noCases) { totalNoCases++; return; }  // exclude from compliance metrics
+    totalActive++;
+    if (r.textChainReminded !== null) { textChainAnswered++; if (r.textChainReminded === 'yes') textChainCompliant++; }
+    if (r.attendingOnBoard === 'no') attendingMissing++;
+    if (r.extenderOnBoard === 'no') extenderMissing++;
+    totalReminders += r.remindersNeeded.length;
+  });
+
+  const textChainPct = textChainAnswered > 0 ? Math.round((textChainCompliant/textChainAnswered)*100) : 0;
+
+  let html = `
+    <div class="report-summary">
+      <h2>Rounding Summary</h2>
+      <div class="meta-line">${new Date(round.startedAt).toLocaleString([], {dateStyle:'full', timeStyle:'short'})}</div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="num">${totalChecked}/${OR_NUMBERS.length}</div><div class="lbl">Rooms checked</div></div>
+        <div class="stat-box"><div class="num">${totalNoCases}</div><div class="lbl">No cases today</div></div>
+        <div class="stat-box ${totalFlagged>0?'flag':''}"><div class="num">${totalFlagged}</div><div class="lbl">Flagged</div></div>
+        <div class="stat-box ${textChainPct>=80?'ok':textChainPct>0?'flag':''}"><div class="num">${textChainPct}%</div><div class="lbl">Teams Chat compliance</div></div>
+        <div class="stat-box ${attendingMissing>0?'flag':''}"><div class="num">${attendingMissing}</div><div class="lbl">Attending missing</div></div>
+        <div class="stat-box ${extenderMissing>0?'flag':''}"><div class="num">${extenderMissing}</div><div class="lbl">Extender missing</div></div>
+        <div class="stat-box ${totalReminders>0?'flag':''}"><div class="num">${totalReminders}</div><div class="lbl">Reminders to deliver</div></div>
+      </div>
+
+      <h3 style="font-size:14px; margin:18px 0 8px 0; text-transform:uppercase; letter-spacing:0.5px; color:var(--muted);">Room-by-Room</h3>
+  `;
+
+  OR_NUMBERS.forEach(n => {
+    const r = round.rooms[n];
+    const s = roomStatus(r);
+    let detailLines = [];
+
+    if (s === 'nocases') {
+      detailLines.push(`<div class="line" style="color:var(--muted); font-weight:600;">— No cases today</div>`);
+      if (r.notes) detailLines.push(`<div class="line" style="font-style:italic; color:var(--muted);">Notes: ${escapeHTML(r.notes)}</div>`);
+    } else if (s === 'pending') {
+      detailLines = [`<div class="line" style="color:var(--muted);">Not yet checked</div>`];
+    } else {
+      if (r.textChainReminded === 'yes') detailLines.push(`<div class="line ok-line">✓ Teams Chat: reminded</div>`);
+      else if (r.textChainReminded === 'no') detailLines.push(`<div class="line flag-line">⚑ Teams Chat: NOT reminded</div>`);
+      else detailLines.push(`<div class="line">Teams Chat: —</div>`);
+
+      if (r.attendingName) detailLines.push(`<div class="line">Attending: ${escapeHTML(r.attendingName)}${r.attendingOnBoard==='no'?' <span style="color:var(--flag);font-weight:600">(missing from board)</span>':''}</div>`);
+      else if (r.attendingOnBoard === 'no') detailLines.push(`<div class="line flag-line">⚑ Attending missing from board</div>`);
+
+      if (r.extenderName) detailLines.push(`<div class="line">Extender: ${escapeHTML(r.extenderName)}${r.extenderOnBoard==='no'?' <span style="color:var(--flag);font-weight:600">(missing from board)</span>':''}</div>`);
+      else if (r.extenderOnBoard === 'no') detailLines.push(`<div class="line flag-line">⚑ Extender missing from board</div>`);
+
+      if (r.remindersNeeded.length) {
+        detailLines.push(`<div class="line flag-line">→ Reminders: ${r.remindersNeeded.map(k => REMINDER_FLAGS[k]).join('; ')}</div>`);
+      }
+      if (r.flagged) detailLines.push(`<div class="line flag-line"><strong>⚑ ROOM FLAGGED FOR FOLLOW-UP</strong></div>`);
+      if (r.notes) detailLines.push(`<div class="line" style="font-style:italic; color:var(--muted);">Notes: ${escapeHTML(r.notes)}</div>`);
+    }
+
+    html += `
+      <div class="or-row">
+        <div class="label">OR ${n}</div>
+        <div class="details">${detailLines.join('')}</div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+  content.innerHTML = html;
+}
+
+/* ==================== Export ==================== */
+function exportCSV() {
+  const round = state.currentRound;
+  const rows = [
+    ['OR','No Cases','Teams Chat Reminded','Attending Name','Attending On Board','Extender Name','Extender On Board','Reminders Needed','Flagged','Notes','Last Updated']
+  ];
+  OR_NUMBERS.forEach(n => {
+    const r = round.rooms[n];
+    rows.push([
+      `OR ${n}`,
+      r.noCases ? 'YES' : '',
+      r.textChainReminded || '',
+      r.attendingName || '',
+      r.attendingOnBoard || '',
+      r.extenderName || '',
+      r.extenderOnBoard || '',
+      r.remindersNeeded.map(k => REMINDER_FLAGS[k]).join('; '),
+      r.flagged ? 'YES' : '',
+      r.notes || '',
+      r.lastUpdated || ''
+    ]);
+  });
+  const csv = rows.map(row => row.map(cell => {
+    const s = String(cell).replace(/"/g,'""');
+    return /[",\n]/.test(s) ? `"${s}"` : s;
+  }).join(',')).join('\n');
+
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const dt = new Date(round.startedAt).toISOString().slice(0,16).replace(/[:T]/g,'-');
+  const a = document.createElement('a');
+  a.href = url; a.download = `OR_Round_${dt}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportHTML() {
+  const reportEl = document.getElementById('report-content').innerHTML;
+  const dt = new Date(state.currentRound.startedAt).toISOString().slice(0,16).replace(/[:T]/g,'-');
+  const styles = document.querySelector('style').innerHTML;
+  const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>OR Round ${dt}</title><style>${styles}</style></head><body><main style="padding:20px;">${reportEl}</main></body></html>`;
+  const blob = new Blob([doc], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `OR_Round_${dt}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ==================== Tabs ==================== */
+let currentTab = 'round';
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll('nav.tabs button').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === name);
+  });
+  document.getElementById('tab-round').style.display = name === 'round' ? '' : 'none';
+  document.getElementById('tab-report').style.display = name === 'report' ? '' : 'none';
+  document.getElementById('tab-providers').style.display = name === 'providers' ? '' : 'none';
+  if (name === 'report') renderReport();
+  if (name === 'providers') renderProviders();
+}
+
+/* ==================== Complete & Send ==================== */
+function completeAndSend() {
+  const round = state.currentRound;
+  const payload = buildTextPayload(round);
+
+  // Try clipboard
+  copyToClipboard(payload.text).then(success => {
+    showCompleteModal(payload, success);
+  });
+}
+
+function buildTextPayload(round) {
+  const dt = new Date(round.startedAt);
+  const dateStr = dt.toLocaleString([], {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
+
+  // Calculate stats
+  let textChainCompliant = 0, textChainAnswered = 0;
+  let attendingMissing = 0, extenderMissing = 0;
+  let totalFlagged = 0, totalNoCases = 0, totalChecked = 0;
+  const flaggedRooms = [];
+  const remindersList = [];
+
+  OR_NUMBERS.forEach(n => {
+    const r = round.rooms[n];
+    const s = roomStatus(r);
+    if (s !== 'pending') totalChecked++;
+    if (r.noCases) { totalNoCases++; return; }
+    if (r.flagged) { totalFlagged++; flaggedRooms.push(n); }
+    if (r.textChainReminded === 'yes') { textChainAnswered++; textChainCompliant++; }
+    else if (r.textChainReminded === 'no') textChainAnswered++;
+    if (r.attendingOnBoard === 'no') attendingMissing++;
+    if (r.extenderOnBoard === 'no') extenderMissing++;
+    if (r.remindersNeeded.length) {
+      r.remindersNeeded.forEach(k => remindersList.push(`OR ${n}: ${REMINDER_FLAGS[k]}`));
+    }
+  });
+
+  const textChainPct = textChainAnswered > 0 ? Math.round((textChainCompliant/textChainAnswered)*100) : null;
+
+  // Build human-readable text
+  let txt = `OR ROUND — ${dateStr}\n`;
+  txt += `${'─'.repeat(32)}\n`;
+  txt += `Rooms checked: ${totalChecked}/${OR_NUMBERS.length}`;
+  if (totalNoCases) txt += ` (${totalNoCases} no cases)`;
+  txt += `\n`;
+  if (textChainPct !== null) txt += `Teams Chat compliance: ${textChainPct}%\n`;
+  if (attendingMissing) txt += `Attending missing: ${attendingMissing}\n`;
+  if (extenderMissing) txt += `Extender missing: ${extenderMissing}\n`;
+  if (totalFlagged) txt += `Flagged: ${totalFlagged} (OR ${flaggedRooms.join(', ')})\n`;
+
+  if (remindersList.length) {
+    txt += `\nReminders to deliver:\n`;
+    remindersList.forEach(r => txt += `  • ${r}\n`);
+  }
+
+  // Per-room detail
+  txt += `\n${'─'.repeat(32)}\nROOM DETAIL\n${'─'.repeat(32)}\n`;
+  OR_NUMBERS.forEach(n => {
+    const r = round.rooms[n];
+    const s = roomStatus(r);
+    if (s === 'pending') {
+      txt += `OR ${n}: —\n`;
+      return;
+    }
+    if (s === 'nocases') {
+      txt += `OR ${n}: no cases${r.notes?` | ${r.notes}`:''}\n`;
+      return;
+    }
+    const parts = [];
+    if (r.flagged) parts.push('⚑FLAGGED');
+    if (r.textChainReminded === 'yes') parts.push('TC✓');
+    else if (r.textChainReminded === 'no') parts.push('TC✗');
+    if (r.attendingName) {
+      parts.push(`Att: ${r.attendingName}${r.attendingOnBoard==='no'?' (off board)':''}`);
+    } else if (r.attendingOnBoard === 'no') {
+      parts.push('Att: missing');
+    }
+    if (r.extenderName) {
+      parts.push(`Ext: ${r.extenderName}${r.extenderOnBoard==='no'?' (off board)':''}`);
+    } else if (r.extenderOnBoard === 'no') {
+      parts.push('Ext: missing');
+    }
+    if (r.notes) parts.push(`Notes: ${r.notes}`);
+    txt += `OR ${n}: ${parts.join(' | ')}\n`;
+  });
+
+  // Machine-readable payload appended at end (for master report import)
+  const machineData = {
+    v: 1,
+    id: round.id,
+    startedAt: round.startedAt,
+    completedAt: new Date().toISOString(),
+    rooms: round.rooms,
+    stats: {
+      totalChecked, totalNoCases, totalFlagged,
+      textChainPct, textChainCompliant, textChainAnswered,
+      attendingMissing, extenderMissing
+    }
+  };
+  txt += `\n${'─'.repeat(32)}\n--ORDATA-START--\n${btoa(unescape(encodeURIComponent(JSON.stringify(machineData))))}\n--ORDATA-END--`;
+
+  return { text: txt, data: machineData };
+}
+
+function copyToClipboard(text) {
+  return new Promise(resolve => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => resolve(true), () => fallbackCopy(text, resolve));
+    } else {
+      fallbackCopy(text, resolve);
+    }
+  });
+}
+
+function fallbackCopy(text, resolve) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    resolve(ok);
+  } catch(e) { resolve(false); }
+}
+
+function showCompleteModal(payload, copied) {
+  const modal = document.getElementById('complete-modal');
+  const ta = document.getElementById('complete-payload');
+  const status = document.getElementById('complete-status');
+  ta.value = payload.text;
+  status.innerHTML = copied
+    ? '<span style="color:var(--ok);">✓ Copied to clipboard.</span> Paste into your Messages app to text it.'
+    : '<span style="color:var(--warn);">Auto-copy blocked.</span> Tap the textarea below, select all, and copy manually.';
+  modal.classList.add('show');
+}
+
+function archiveAndReset() {
+  // Archive current round to history, then start fresh
+  state.history.unshift({...state.currentRound, completedAt: new Date().toISOString()});
+  if (state.history.length > 30) state.history = state.history.slice(0, 30);
+  state.currentRound = newRoundObject();
+  openCards.clear();
+  saveState();
+  renderRound();
+  updateProgress();
+  closeCompleteModal();
+}
+
+function closeCompleteModal() {
+  document.getElementById('complete-modal').classList.remove('show');
+}
+
+function copyAgain() {
+  const ta = document.getElementById('complete-payload');
+  copyToClipboard(ta.value).then(ok => {
+    const status = document.getElementById('complete-status');
+    if (ok) status.innerHTML = '<span style="color:var(--ok);">✓ Copied again.</span>';
+  });
+}
+
+/* ==================== Reset ==================== */
+function resetCurrentRound() {
+  confirmModal(
+    'Reset current round',
+    'Clear all room entries and start a fresh round? Your provider list and archived history will be preserved. This cannot be undone.',
+    () => {
+      state.currentRound = newRoundObject();
+      openCards.clear();
+      saveState();
+      renderRound();
+      updateProgress();
+    }
+  );
+}
+
+/* ==================== Rounds ==================== */
+function newRound() {
+  confirmModal('Start new round', 'Archive the current round and start fresh? Current round will be saved to history.', () => {
+    state.history.unshift(state.currentRound);
+    if (state.history.length > 30) state.history = state.history.slice(0,30);
+    state.currentRound = newRoundObject();
+    openCards.clear();
+    saveState();
+    renderRound();
+    updateProgress();
+  });
+}
+
+/* ==================== Modal ==================== */
+function confirmModal(title, msg, onOk) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  document.getElementById('confirm-modal').classList.add('show');
+  const okBtn = document.getElementById('confirm-ok');
+  const newBtn = okBtn.cloneNode(true);
+  okBtn.parentNode.replaceChild(newBtn, okBtn);
+  newBtn.addEventListener('click', () => {
+    closeModal();
+    onOk();
+  });
+}
+function closeModal() { document.getElementById('confirm-modal').classList.remove('show'); }
+
+/* ==================== Init ==================== */
+try {
+  renderRound();
+  updateProgress();
+} catch(e) {
+  console.error('Init failed:', e);
+  document.getElementById('or-list').innerHTML = `
+    <div style="background:#fff; border:1px solid var(--flag); border-radius:10px; padding:18px; margin-top:10px;">
+      <h3 style="margin:0 0 8px 0; color:var(--flag);">Tool failed to load</h3>
+      <p style="margin:0 0 12px 0; font-size:13px;">Error: ${String(e.message || e).replace(/</g,'&lt;')}</p>
+      <p style="margin:0 0 12px 0; font-size:13px;">This usually means saved data from a previous version is incompatible. Tap below to reset and recover.</p>
+      <button class="btn primary" onclick="if(confirm('Clear all saved data and reload? This will erase your current round, providers list, and history.')) { localStorage.removeItem('or-rounding-state-v1'); location.reload(); }">Reset Data &amp; Reload</button>
+    </div>
+  `;
+}
+</script>
+
+</body>
+</html>
